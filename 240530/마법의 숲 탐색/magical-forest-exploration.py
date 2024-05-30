@@ -21,14 +21,10 @@ class Golem:
     def move_left(self):
         self.col -= 1
         self.door = (self.door - 1) % 4
-        if DEBUG:
-            print(self.col, self.row)
 
     def move_right(self):
         self.col += 1
         self.door = (self.door + 1) % 4
-        if DEBUG:
-            print(self.col, self.row)
 
     def move_down(self):
         self.row += 1
@@ -134,9 +130,11 @@ class Board:
                 door = int(self.board[y][x])
                 door_direction = directions[door]
                 door_x, door_y = x + door_direction[0], y + door_direction[1]
+                if visited[door_y][door_x]:
+                    continue
                 visited[door_y][door_x] = True
 
-                max_soul = y + 1
+                max_soul = max(max_soul, y + 1)
                 for direction in directions:
                     search_x = door_x + direction[0]
                     search_y = door_y + direction[1]
@@ -168,6 +166,7 @@ class Board:
 
     def add_golem(self, golem: Golem) -> None:
         # TODO:골렘 움직일수 있는지 체크
+        move_left = False
         move_right = False
         while True:
             if self.is_down(golem):
@@ -180,8 +179,9 @@ class Board:
             if self.is_leftdown(golem) and not move_right:
                 golem.move_left()
                 golem.move_down()
+                move_left = True
                 continue
-            else:
+            elif not move_left:
                 if self.is_rightdown(golem):
                     golem.move_right()
                     golem.move_down()
@@ -189,6 +189,8 @@ class Board:
                     continue
                 else:
                     break
+            else:
+                break
 
         if golem.row > 0:
             # TODO:골렘 추가후 정령 위치 계산
