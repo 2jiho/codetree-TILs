@@ -1,7 +1,10 @@
 import pathlib
 import sys
 
+DEBUG = False
 input = sys.stdin.readline
+if DEBUG:
+    input = pathlib.Path(__file__).with_suffix(".txt").open("rt").readline
 
 R, C, K = list(map(int, input().strip().split()))
 
@@ -9,7 +12,7 @@ R, C, K = list(map(int, input().strip().split()))
 class Golem:
     def __init__(self, col, door) -> None:
         self.col = col
-        self.row = -2
+        self.row = -1
         self.door = door
 
     def __repr__(self) -> str:
@@ -18,10 +21,14 @@ class Golem:
     def move_left(self):
         self.col -= 1
         self.door = (self.door - 1) % 4
+        if DEBUG:
+            print(self.col, self.row)
 
     def move_right(self):
         self.col += 1
         self.door = (self.door + 1) % 4
+        if DEBUG:
+            print(self.col, self.row)
 
     def move_down(self):
         self.row += 1
@@ -35,9 +42,10 @@ for _ in range(K):
     ci, di = list(map(int, input().strip().split()))
     golems.append(Golem(ci - 1, di))
 
-# for i, golem in enumerate(golems):
-#     print(i + 1, golem)
-# print()
+if DEBUG:
+    for i, golem in enumerate(golems):
+        print(i + 1, golem)
+    print()
 
 
 class Board:
@@ -58,15 +66,15 @@ class Board:
 
     def reset_board(self) -> None:
         self.board = [["-"] * self.C for _ in range(self.R)]
-        self.calc_souls = {}
 
     def is_right(self, golem: Golem) -> bool:
         for point in [(1, -1), (2, 0), (1, 1)]:
             x, y = golem.col + point[0], golem.row + point[1]
             if x >= self.C:
                 return False
-            if self.board[y][x] != "-":
+            if self.board[y][x] != "-" and (0 <= x < self.C and 0 <= y < self.R):
                 return False
+
         return True
 
     def is_left(self, golem: Golem) -> bool:
@@ -74,7 +82,7 @@ class Board:
             x, y = golem.col + point[0], golem.row + point[1]
             if x < 0:
                 return False
-            if self.board[y][x] != "-":
+            if self.board[y][x] != "-" and (0 <= x < self.C and 0 <= y < self.R):
                 return False
         return True
 
@@ -83,7 +91,7 @@ class Board:
             x, y = golem.col + point[0], golem.row + point[1]
             if y >= self.R:
                 return False
-            if self.board[y][x] != "-":
+            if self.board[y][x] != "-" and (0 <= x < self.C and 0 <= y < self.R):
                 return False
         return True
 
@@ -110,34 +118,53 @@ class Board:
         return False
 
     def calc_soul(self, golem: Golem) -> None:
-        temp_soul = golem.row + 1
-        x, y = golem.col, golem.row
-        # 도어 주변 3방 탐색
-        door = int(self.board[y][x])
+        visited = [[False] * self.C for _ in range(self.R)]
         directions = [(0, -1), (1, 0), (0, 1), (-1, 0)]
-        door_direction = directions[door]
-        x += door_direction[0]
-        y += door_direction[1]
 
-        for direction in directions:
-            search_x = x + direction[0]
-            search_y = y + direction[1]
-            search_soul = 0
-            if 0 <= search_x < self.C and 0 <= search_y < self.R:
-                if self.board[search_y][search_x] == "T":
-                    search_soul = self.calc_souls[(search_x, search_y + 1)]
-                if self.board[search_y][search_x] == "R":
-                    search_soul = self.calc_souls[(search_x - 1, search_y)]
-                if self.board[search_y][search_x] == "B":
-                    search_soul = self.calc_souls[(search_x, search_y - 1)]
-                if self.board[search_y][search_x] == "L":
-                    search_soul = self.calc_souls[(search_x + 1, search_y)]
-            temp_soul = max(temp_soul, search_soul)
+        # TODO:BFS
+        queue = []
 
-        # 현재 골렘 최대값 저장
-        self.calc_souls[(golem.col, golem.row)] = temp_soul
+        queue.append((golem.col, golem.row))
+        max_soul = 0
+        while queue:
+            x, y = queue.pop(0)
+            if not visited[y][x]:
+                visited[y][x] = True
+
+                door = int(self.board[y][x])
+                door_direction = directions[door]
+                door_x, door_y = x + door_direction[0], y + door_direction[1]
+                visited[door_y][door_x] = True
+
+                max_soul = y + 1
+                for direction in directions:
+                    search_x = door_x + direction[0]
+                    search_y = door_y + direction[1]
+                    if 0 <= search_x < self.C and 0 <= search_y < self.R:
+                        visited[search_y][search_x] = True
+                        if self.board[search_y][search_x] == "T":
+                            new_x = search_x
+                            new_y = search_y + 1
+                            queue.append((new_x, new_y))
+                            max_soul = max(max_soul, new_y + 1)
+                        if self.board[search_y][search_x] == "R":
+                            new_x = search_x - 1
+                            new_y = search_y
+                            queue.append((new_x, new_y))
+                            max_soul = max(max_soul, new_y + 1)
+                        if self.board[search_y][search_x] == "B":
+                            new_x = search_x
+                            new_y = search_y - 1
+                            queue.append((new_x, new_y))
+                            max_soul = max(max_soul, new_y + 1)
+                        if self.board[search_y][search_x] == "L":
+                            new_x = search_x + 1
+                            new_y = search_y
+                            queue.append((new_x, new_y))
+                            max_soul = max(max_soul, new_y + 1)
+
         # 총합 구하기
-        self.sum_soul += self.calc_souls[(golem.col, golem.row)] + 1
+        self.sum_soul += max_soul + 1
 
     def add_golem(self, golem: Golem) -> None:
         # TODO:골렘 움직일수 있는지 체크
@@ -149,12 +176,17 @@ class Board:
 
             if golem.row == self.R - 2:
                 break
+
             if self.is_leftdown(golem) and not move_right:
                 golem.move_left()
+                golem.move_down()
+                continue
             else:
                 if self.is_rightdown(golem):
                     golem.move_right()
+                    golem.move_down()
                     move_right = True
+                    continue
                 else:
                     break
 
@@ -177,8 +209,11 @@ class Board:
 board = Board(R, C)
 
 for i, golem in enumerate(golems):
-    # print(i + 1, golem)
+    if DEBUG:
+        print(i + 1, golem)
     board.add_golem(golem)
-    # print(board)
+    if DEBUG:
+        print(board.result())
+        print(board)
 
 print(board.result())
